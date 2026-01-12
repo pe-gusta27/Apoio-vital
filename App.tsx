@@ -1,120 +1,150 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, Component, ErrorInfo, ReactNode } from 'react';
 import { Header } from './components/Header';
 import { QuickActions } from './components/QuickActions';
 import { GuidancePanel } from './components/GuidancePanel';
 import { ContactManager } from './components/ContactManager';
-import { AppSection, EmergencyContact, EmergencyInstruction, AIQueryItem } from './types';
-import { Info, X, BellRing } from 'lucide-react';
+import { AccessibilitySettings } from './components/AccessibilitySettings';
+import { AppSection, EmergencyContact, EmergencyInstruction, AIQueryItem, AccessibilitySettings as SettingsType } from './types';
+import { Info, X, BellRing, AlertTriangle } from 'lucide-react';
+
+// Error Boundary para evitar tela branca total
+// Fix: Use React.Component explicitly and make children optional to resolve property access and JSX validation errors
+class ErrorBoundary extends React.Component<{ children?: React.ReactNode }, { hasError: boolean }> {
+  // Fix: Property initializer for state instead of constructor for cleaner TS compatibility
+  state = { hasError: false };
+
+  static getDerivedStateFromError(_: Error) {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error("Erro capturado:", error, errorInfo);
+  }
+
+  render() {
+    // Fix: 'this.state' is now correctly inherited from React.Component
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-10 text-center">
+          <div className="bg-red-100 p-6 rounded-full mb-6">
+            <AlertTriangle className="w-16 h-16 text-red-600" />
+          </div>
+          <h2 className="text-2xl font-black text-slate-800 mb-2">Ops! Algo deu errado.</h2>
+          <p className="text-slate-500 mb-8">Ocorreu um erro inesperado na inicialização do aplicativo.</p>
+          <button 
+            onClick={() => window.location.reload()}
+            className="bg-blue-600 text-white px-8 py-4 rounded-2xl font-bold shadow-xl"
+          >
+            Tentar Novamente
+          </button>
+        </div>
+      );
+    }
+    // Fix: 'this.props' is now correctly inherited from React.Component
+    return this.props.children;
+  }
+}
 
 const DEFAULT_GUIDES: EmergencyInstruction[] = [
   { id: '1', title: 'Falta de Ar', icon: 'Wind', category: 'saude', content: '1. Sente-se e tente manter a calma.\n2. Incline o corpo levemente para frente.\n3. Respire devagar pelo nariz.\n4. Se não melhorar em 2 minutos, ligue 192.' },
   { id: '2', title: 'Convulsão', icon: 'Zap', category: 'saude', content: '1. Afaste objetos próximos para evitar ferimentos.\n2. Coloque algo macio sob a cabeça.\n3. NÃO coloque nada na boca.\n4. Deite a pessoa de lado após a crise.\n5. Chame 192.' },
   { id: '3', title: 'Engasgo (Choking)', icon: '🩹', category: 'saude', content: '1. Se a pessoa tosse, incentive-a a tossir com força.\n2. Se não consegue respirar ou falar, posicione-se atrás dela.\n3. Realize a Manobra de Heimlich: abrace a cintura e pressione o abdome para cima e para dentro com força.\n4. Se a pessoa desmaiar, ligue 192 imediatamente.' },
-  { id: '4', title: 'Queimaduras', icon: '🔥', category: 'saude', content: '1. Resfrie a área com água corrente fria por 15 minutos.\n2. NÃO use gelo, pasta de dente ou pomadas.\n3. Cubra levemente com um pano limpo e úmido.\n4. Se houver bolhas ou a pele estiver solta, procure o hospital.' },
-  { id: '5', title: 'Cortes e Sangramento', icon: '🩸', category: 'saude', content: '1. Lave a ferida com água corrente e sabão.\n2. Pressione o local com um pano limpo por 5-10 minutos sem parar.\n3. Se o sangue não parar, mantenha a pressão e eleve a região.\n4. Procure um posto de saúde para pontos se o corte for fundo.' },
-  { id: '6', title: 'Hemorragia Grave', icon: '🆘', category: 'saude', content: '1. Ligue 192 imediatamente.\n2. Pressione a ferida com toda a força usando um pano limpo.\n3. Se o pano encharcar, coloque outro por cima sem remover o primeiro.\n4. Se possível, eleve o membro ferido acima do nível do coração.' },
-  { id: '7', title: 'Desmaio (Fainting)', icon: '😵', category: 'saude', content: '1. Deite a pessoa de costas em local ventilado.\n2. Eleve as pernas dela (cerca de 30cm) acima do nível do coração.\n3. Afrouxe roupas apertadas.\n4. Se não acordar em 1 minuto ou se for idoso, ligue 192.' },
   { id: '8', title: 'AVC (Derrame)', icon: '🧠', category: 'saude', content: '1. SORRISO: Peça para sorrir. A boca entortou?\n2. ABRAÇO: Peça para levantar os braços. Um caiu?\n3. FALA: Peça para repetir uma frase. A fala está enrolada?\n4. Se notar qualquer sinal, ligue 192 IMEDIATAMENTE.' },
-  { id: '9', title: 'Dor no Peito (Infarto)', icon: '💔', category: 'saude', content: '1. Ligue 192 imediatamente.\n2. Mantenha a pessoa sentada e em repouso absoluto.\n3. Afrouxe as roupas e tente acalmá-la.\n4. Não ofereça alimentos ou bebidas enquanto espera o SAMU.' },
   { id: '10', title: 'Crise de Ansiedade', icon: 'Brain', category: 'mental', content: '1. Encontre um lugar calmo e seguro.\n2. Inspire pelo nariz contando até 4.\n3. Segure o ar por 4 segundos.\n4. Solte lentamente pela boca contando até 4.\n5. Foque em 3 objetos que você consegue ver agora.' },
-  { id: '11', title: 'Queda / Mobilidade', icon: 'Accessibility', category: 'mobilidade', content: '1. Não tente levantar a pessoa bruscamente.\n2. Pergunte onde dói e verifique se há deformidade em ossos.\n3. Se houver dor forte na coluna ou quadril, NÃO movimente.\n4. Agasalhe a pessoa e ligue para um familiar ou 192.' },
-  { id: '12', title: 'Animais Peçonhentos', icon: '🦂', category: 'saude', content: '1. Lave o local da picada apenas com água e sabão.\n2. Mantenha a vítima em repouso e o membro afetado elevado.\n3. NÃO faça torniquete, cortes ou sucção no local.\n4. Se possível, tire uma foto do animal para identificação médica.\n5. Leve a vítima ao hospital mais próximo imediatamente ou ligue 192.' },
-  { id: '13', title: 'Recém-nascido', icon: '👶', category: 'saude', content: '1. Engasgo: Coloque o bebê de bruços no seu arminclined for baixo. Dê 5 tapinhas firmes nas costas.\n2. Vire o bebê e faça 5 compressões no peito com dois dedos.\n3. Respiração: Se o bebê não chora ou está roxo, ligue 192 imediatamente.\n4. Febre: Mantenha o bebê hidratado e procure auxílio médico urgente.' },
-  { id: '14', title: 'Parada Cardíaca', icon: '❤️', category: 'saude', content: '1. Ligue 192 (SAMU) ou 193 (Bombeiros) imediatamente.\n2. Verifique se a pessoa responde. Se não, deite-a de costas em superfície dura.\n3. Coloque as mãos no centro do peito da vítima.\n4. Com os braços esticados, empurre o peito com força e rapidez (100 a 120 vezes por minuto).\n5. Deixe o peito voltar à posição normal entre cada compressão.\n6. Continue até o socorro chegar ou a pessoa reagir.' },
 ];
 
-const App: React.FC = () => {
+const DEFAULT_SETTINGS: SettingsType = {
+  fontSize: 'normal',
+  highContrast: 'none',
+  animations: true,
+  hapticFeedback: true,
+  hapticIntensity: 'medium',
+};
+
+const AppContent: React.FC = () => {
   const [activeSection, setActiveSection] = useState<AppSection>(AppSection.HOME);
   const [toast, setToast] = useState<{message: string, type: 'alert' | 'info'} | null>(null);
   
   const [contacts, setContacts] = useState<EmergencyContact[]>(() => {
-    const saved = localStorage.getItem('apoio_vital_contacts');
-    return saved ? JSON.parse(saved) : [];
+    try {
+      const saved = localStorage.getItem('apoio_vital_contacts');
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
   });
 
   const [guides, setGuides] = useState<EmergencyInstruction[]>(() => {
-    const saved = localStorage.getItem('apoio_vital_guides');
-    const parsed = saved ? JSON.parse(saved) : DEFAULT_GUIDES;
-    return parsed;
+    try {
+      const saved = localStorage.getItem('apoio_vital_guides');
+      return saved ? JSON.parse(saved) : DEFAULT_GUIDES;
+    } catch { return DEFAULT_GUIDES; }
   });
 
   const [aiHistory, setAiHistory] = useState<AIQueryItem[]>(() => {
-    const saved = localStorage.getItem('apoio_vital_ai_history');
-    return saved ? JSON.parse(saved) : [];
+    try {
+      const saved = localStorage.getItem('apoio_vital_ai_history');
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
   });
 
-  const [showWelcome, setShowWelcome] = useState(!localStorage.getItem('apoio_vital_onboarded'));
+  const [accSettings, setAccSettings] = useState<SettingsType>(() => {
+    try {
+      const saved = localStorage.getItem('apoio_vital_acc_settings');
+      return saved ? JSON.parse(saved) : DEFAULT_SETTINGS;
+    } catch { return DEFAULT_SETTINGS; }
+  });
+
+  const [showWelcome, setShowWelcome] = useState(() => !localStorage.getItem('apoio_vital_onboarded'));
+
+  const triggerHaptic = useCallback((type: 'light' | 'medium' | 'heavy' | 'alert') => {
+    if (!accSettings.hapticFeedback || !navigator.vibrate) return;
+    let baseMs = 50;
+    if (accSettings.hapticIntensity === 'low') baseMs = 20;
+    if (accSettings.hapticIntensity === 'high') baseMs = 100;
+    switch (type) {
+      case 'light': navigator.vibrate(baseMs * 0.5); break;
+      case 'medium': navigator.vibrate(baseMs); break;
+      case 'heavy': navigator.vibrate(baseMs * 1.5); break;
+      case 'alert': navigator.vibrate([baseMs, 50, baseMs, 50, baseMs * 2]); break;
+    }
+  }, [accSettings.hapticFeedback, accSettings.hapticIntensity]);
 
   useEffect(() => {
     localStorage.setItem('apoio_vital_contacts', JSON.stringify(contacts));
   }, [contacts]);
 
   useEffect(() => {
-    localStorage.setItem('apoio_vital_guides', JSON.stringify(guides));
-  }, [guides]);
+    localStorage.setItem('apoio_vital_acc_settings', JSON.stringify(accSettings));
+    const body = document.body;
+    body.classList.remove('font-size-large', 'font-size-xl', 'contrast-dark', 'contrast-light', 'no-animations');
+    if (accSettings.fontSize === 'large') body.classList.add('font-size-large');
+    if (accSettings.fontSize === 'xl') body.classList.add('font-size-xl');
+    if (accSettings.highContrast === 'dark') body.classList.add('contrast-dark');
+    if (accSettings.highContrast === 'light') body.classList.add('contrast-light');
+    if (!accSettings.animations) body.classList.add('no-animations');
+  }, [accSettings]);
 
   useEffect(() => {
-    localStorage.setItem('apoio_vital_ai_history', JSON.stringify(aiHistory));
-  }, [aiHistory]);
+    if (toast) triggerHaptic(toast.type === 'alert' ? 'alert' : 'heavy');
+  }, [toast, triggerHaptic]);
 
-  const handleCall = (phone: string) => {
-    window.location.href = `tel:${phone}`;
+  const handleCall = (phone: string) => { 
+    triggerHaptic('heavy');
+    window.location.href = `tel:${phone}`; 
   };
 
   const handleSilentAlert = (contact: EmergencyContact) => {
-    const message = encodeURIComponent(`ALERTA DE EMERGÊNCIA ApoioVital: Preciso de ajuda urgente. Este é um alerta silencioso enviado por ${contact.name ? 'um de seus contatos' : 'mim'}.`);
-    
-    setToast({ 
-      message: `Enviando alerta para ${contact.name}...`, 
-      type: 'alert' 
-    });
-
+    const message = encodeURIComponent(`ALERTA DE EMERGÊNCIA ApoioVital: Preciso de ajuda urgente.`);
+    setToast({ message: `Alerta enviado para ${contact.name}...`, type: 'alert' });
     setTimeout(() => setToast(null), 4000);
     window.open(`sms:${contact.phone}?body=${message}`, '_blank');
   };
 
-  const addContact = (newContact: Omit<EmergencyContact, 'id'>) => {
-    const contact: EmergencyContact = {
-      ...newContact,
-      id: Date.now().toString(),
-    };
-    setContacts(prev => [...prev, contact]);
-  };
-
-  const deleteContact = (id: string) => {
-    setContacts(prev => prev.filter(c => c.id !== id));
-  };
-
-  const setPrimaryContact = (id: string) => {
-    setContacts(prev => prev.map(c => ({
-      ...c,
-      isPrimary: c.id === id
-    })));
-  };
-
-  const updateGuideIcon = (id: string, newIcon: string) => {
-    setGuides(prev => prev.map(g => g.id === id ? { ...g, icon: newIcon } : g));
-  };
-
-  const addAiHistoryItem = (item: AIQueryItem) => {
-    setAiHistory(prev => [item, ...prev].slice(0, 20)); 
-  };
-
-  const clearAiHistory = () => {
-    setAiHistory([]);
-  };
-
-  const closeWelcome = () => {
-    setShowWelcome(false);
-    localStorage.setItem('apoio_vital_onboarded', 'true');
-  };
-
   return (
-    <div className="max-w-md mx-auto min-h-screen flex flex-col bg-slate-50 shadow-2xl relative overflow-hidden">
+    <div className="max-w-md mx-auto min-h-screen flex flex-col bg-slate-50 shadow-2xl relative overflow-hidden transition-colors duration-300">
       <Header 
-        onMenuToggle={() => setActiveSection(AppSection.CONTACTS)} 
-        onHomeClick={() => setActiveSection(AppSection.HOME)}
+        onMenuToggle={() => { triggerHaptic('light'); setActiveSection(AppSection.CONTACTS); }} 
+        onHomeClick={() => { triggerHaptic('light'); setActiveSection(AppSection.HOME); }}
+        onAccessibilityClick={() => { triggerHaptic('light'); setActiveSection(AppSection.ACCESSIBILITY); }}
       />
 
       <main className="flex-1 p-6 pb-24 overflow-y-auto custom-scrollbar">
@@ -129,18 +159,16 @@ const App: React.FC = () => {
               contacts={contacts} 
               onCall={handleCall} 
               onSilentAlert={handleSilentAlert}
-              onNavigate={(section) => setActiveSection(section as AppSection)} 
+              onNavigate={(section) => { triggerHaptic('light'); setActiveSection(section as AppSection); }} 
             />
 
             <div className="mt-8 bg-blue-50 p-5 rounded-2xl border border-blue-100 flex gap-4">
               <div className="bg-blue-500 text-white p-2 rounded-lg h-fit">
-                <div className="w-6 h-6 flex items-center justify-center">
-                  <Info className="w-5 h-5" />
-                </div>
+                <Info className="w-5 h-5" />
               </div>
               <div>
                 <p className="font-bold text-blue-900 text-lg">Dica de Segurança</p>
-                <p className="text-blue-800 mt-1">Mantenha seu telefone sempre carregado e perto de você.</p>
+                <p className="text-blue-800 mt-1">Mantenha seu telefone sempre carregado.</p>
               </div>
             </div>
           </>
@@ -151,7 +179,7 @@ const App: React.FC = () => {
             <div className={`p-4 rounded-2xl shadow-2xl flex items-center gap-3 border-2 ${toast.type === 'alert' ? 'bg-red-600 border-red-400 text-white' : 'bg-blue-600 border-blue-400 text-white'}`}>
               <BellRing className="w-6 h-6 animate-bounce" />
               <p className="font-bold">{toast.message}</p>
-              <button onClick={() => setToast(null)} className="ml-auto">
+              <button onClick={() => setToast(null)} className="ml-auto p-1">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -162,12 +190,12 @@ const App: React.FC = () => {
           <div className="fixed inset-0 z-50 pt-16 bg-slate-900/40 backdrop-blur-sm">
              <GuidancePanel 
               guides={guides}
-              onUpdateIcon={updateGuideIcon}
-              onBack={() => setActiveSection(AppSection.HOME)} 
+              onUpdateIcon={(id, icon) => setGuides(prev => prev.map(g => g.id === id ? { ...g, icon } : g))}
+              onBack={() => { triggerHaptic('light'); setActiveSection(AppSection.HOME); }} 
               initialMode="manual"
               aiHistory={aiHistory}
-              onAddAiHistory={addAiHistoryItem}
-              onClearAiHistory={clearAiHistory}
+              onAddAiHistory={(item) => { triggerHaptic('medium'); setAiHistory(prev => [item, ...prev].slice(0, 20)); }}
+              onClearAiHistory={() => { triggerHaptic('heavy'); setAiHistory([]); }}
              />
           </div>
         )}
@@ -176,12 +204,12 @@ const App: React.FC = () => {
           <div className="fixed inset-0 z-50 pt-16 bg-slate-900/40 backdrop-blur-sm">
              <GuidancePanel 
               guides={guides}
-              onUpdateIcon={updateGuideIcon}
-              onBack={() => setActiveSection(AppSection.HOME)} 
+              onUpdateIcon={(id, icon) => setGuides(prev => prev.map(g => g.id === id ? { ...g, icon } : g))}
+              onBack={() => { triggerHaptic('light'); setActiveSection(AppSection.HOME); }} 
               initialMode="ai"
               aiHistory={aiHistory}
-              onAddAiHistory={addAiHistoryItem}
-              onClearAiHistory={clearAiHistory}
+              onAddAiHistory={(item) => { triggerHaptic('medium'); setAiHistory(prev => [item, ...prev].slice(0, 20)); }}
+              onClearAiHistory={() => { triggerHaptic('heavy'); setAiHistory([]); }}
              />
           </div>
         )}
@@ -190,33 +218,40 @@ const App: React.FC = () => {
           <div className="fixed inset-0 z-50 pt-16 bg-slate-900/40 backdrop-blur-sm">
              <ContactManager 
                 contacts={contacts}
-                onAdd={addContact}
-                onDelete={deleteContact}
-                onSetPrimary={setPrimaryContact}
-                onBack={() => setActiveSection(AppSection.HOME)} 
+                onAdd={(c) => { triggerHaptic('medium'); setContacts(prev => [...prev, { ...c, id: Date.now().toString() }]); }}
+                onDelete={(id) => { triggerHaptic('heavy'); setContacts(prev => prev.filter(c => c.id !== id)); }}
+                onSetPrimary={(id) => { triggerHaptic('light'); setContacts(prev => prev.map(c => ({ ...c, isPrimary: c.id === id }))); }}
+                onBack={() => { triggerHaptic('light'); setActiveSection(AppSection.HOME); }} 
              />
+          </div>
+        )}
+
+        {activeSection === AppSection.ACCESSIBILITY && (
+          <div className="fixed inset-0 z-50 pt-16 bg-slate-900/40 backdrop-blur-sm">
+            <AccessibilitySettings 
+              settings={accSettings}
+              onUpdate={setAccSettings}
+              onBack={() => { triggerHaptic('light'); setActiveSection(AppSection.HOME); }}
+            />
           </div>
         )}
       </main>
 
       {showWelcome && (
-        <div className="fixed inset-0 z-[100] bg-blue-600 text-white p-10 flex flex-col justify-center items-center text-center animate-in fade-in zoom-in duration-500">
-          <button 
-            onClick={closeWelcome}
-            className="absolute top-8 right-8 p-2 bg-white/20 rounded-full"
-          >
-            <X className="w-6 h-6" />
-          </button>
+        <div className="fixed inset-0 z-[100] bg-blue-600 text-white p-10 flex flex-col justify-center items-center text-center">
           <div className="bg-white p-6 rounded-full mb-8">
             <Info className="w-20 h-20 text-blue-600" />
           </div>
           <h2 className="text-4xl font-black mb-4 leading-tight">Bem-vindo ao ApoioVital</h2>
-          <p className="text-xl opacity-90 mb-12">Estamos aqui para garantir sua segurança com contatos rápidos e orientações inteligentes.</p>
           <button 
-            onClick={closeWelcome}
+            onClick={() => {
+              triggerHaptic('light');
+              setShowWelcome(false);
+              localStorage.setItem('apoio_vital_onboarded', 'true');
+            }}
             className="w-full max-w-xs bg-white text-blue-600 font-black py-5 rounded-2xl text-2xl shadow-2xl active:scale-95 transition-all"
           >
-            Começar Agora
+            Começar
           </button>
         </div>
       )}
@@ -234,5 +269,11 @@ const App: React.FC = () => {
     </div>
   );
 };
+
+const App: React.FC = () => (
+  <ErrorBoundary>
+    <AppContent />
+  </ErrorBoundary>
+);
 
 export default App;

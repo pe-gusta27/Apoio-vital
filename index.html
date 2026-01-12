@@ -10,11 +10,63 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --app-font-size: 16px;
+        }
+
         body {
             font-family: 'Lexend', sans-serif;
             -webkit-tap-highlight-color: transparent;
+            font-size: var(--app-font-size);
+            transition: background-color 0.3s ease, color 0.3s ease;
         }
         
+        /* Font Size Variants */
+        .font-size-large { --app-font-size: 20px; }
+        .font-size-xl { --app-font-size: 24px; }
+
+        /* High Contrast Variants */
+        .contrast-dark {
+            background-color: #000 !important;
+            color: #fff !important;
+        }
+        .contrast-dark * {
+            background-color: transparent !important;
+            color: #fff !important;
+            border-color: #fff !important;
+        }
+        .contrast-dark .bg-blue-600, 
+        .contrast-dark .bg-red-600,
+        .contrast-dark button {
+            background-color: #fff !important;
+            color: #000 !important;
+            border: 2px solid #fff !important;
+        }
+
+        .contrast-light {
+            background-color: #fff !important;
+            color: #000 !important;
+        }
+        .contrast-light * {
+            background-color: transparent !important;
+            color: #000 !important;
+            border-color: #000 !important;
+        }
+        .contrast-light .bg-blue-600, 
+        .contrast-light .bg-red-600,
+        .contrast-light button {
+            background-color: #000 !important;
+            color: #fff !important;
+            border: 2px solid #000 !important;
+        }
+
+        /* Disable Animations */
+        .no-animations *, .no-animations ::before, .no-animations ::after {
+            animation-duration: 0.001ms !important;
+            animation-iteration-count: 1 !important;
+            transition-duration: 0.001ms !important;
+        }
+
         /* Custom Scrollbar Styles */
         .custom-scrollbar::-webkit-scrollbar {
             width: 8px;

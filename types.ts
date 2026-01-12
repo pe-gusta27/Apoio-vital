@@ -1,4 +1,3 @@
-
 export interface EmergencyContact {
   id: string;
   name: string;
@@ -23,9 +22,18 @@ export interface AIQueryItem {
   timestamp: number;
 }
 
+export interface AccessibilitySettings {
+  fontSize: 'normal' | 'large' | 'xl';
+  highContrast: 'none' | 'dark' | 'light';
+  animations: boolean;
+  hapticFeedback: boolean;
+  hapticIntensity: 'low' | 'medium' | 'high';
+}
+
 export enum AppSection {
   HOME = 'home',
   GUIDANCE = 'guidance',
   CONTACTS = 'contacts',
-  AI_ASSISTANT = 'ai_assistant'
+  AI_ASSISTANT = 'ai_assistant',
+  ACCESSIBILITY = 'accessibility'
 }

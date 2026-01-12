@@ -1,4 +1,3 @@
-
 import { GoogleGenAI } from "@google/genai";
 
 export interface AudioData {
@@ -6,9 +5,16 @@ export interface AudioData {
   mimeType: string;
 }
 
-// Function to get guidance from Gemini supporting text and/or audio
+const getAIClient = () => {
+  const apiKey = process.env.API_KEY;
+  if (!apiKey) {
+    throw new Error("API_KEY não configurada no ambiente.");
+  }
+  return new GoogleGenAI({ apiKey });
+};
+
 export const getEmergencyGuidance = async (scenario: string, audio?: AudioData) => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const ai = getAIClient();
   
   const systemInstruction = `
     Você é o ApoioVital, um assistente especializado em fornecer instruções de emergência para pessoas com deficiência ou necessidades especiais.
@@ -40,7 +46,7 @@ export const getEmergencyGuidance = async (scenario: string, audio?: AudioData) 
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: { parts },
+      contents: { parts: parts.length > 0 ? parts : [{ text: "Olá" }] },
       config: {
         systemInstruction,
         temperature: 0.2,
@@ -51,12 +57,12 @@ export const getEmergencyGuidance = async (scenario: string, audio?: AudioData) 
     return response.text;
   } catch (error) {
     console.error("Erro ao obter orientação da IA:", error);
-    throw error; // Lançar erro para que o componente possa ativar o fallback
+    throw error;
   }
 };
 
 export const editImageWithPrompt = async (base64ImageData: string, mimeType: string, prompt: string) => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const ai = getAIClient();
   
   try {
     const response = await ai.models.generateContent({
