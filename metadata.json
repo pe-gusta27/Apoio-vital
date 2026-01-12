@@ -1,0 +1,7 @@
+{
+  "name": "ApoioVital - Assistente de Emergência Acessível",
+  "description": "Um aplicativo focado em acessibilidade para gerenciar contatos de emergência e fornecer orientações imediatas guiadas por IA para pessoas com deficiência ou necessidades especiais.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
